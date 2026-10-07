@@ -29,5 +29,8 @@ jobs:
         run: python stars_lists.py --help
       - name: Missing config exits with error
         run: |
-          python stars_lists.py lists --config /nonexistent.json 2>&1 | grep -q "找不到配置文件" && exit 0 || exit 1
+          # pipefail 下「失败命令 | grep」必失败，改为先吸收退出码再断言输出
+          out="$(python stars_lists.py lists --config /nonexistent.json 2>&1 || true)"
+          echo "$out"
+          echo "$out" | grep -q "找不到配置文件"
         shell: bash
