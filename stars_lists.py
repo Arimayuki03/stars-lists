@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 stars-lists —— GitHub Stars 自动分类工具
 
@@ -26,7 +25,6 @@ import os
 import subprocess
 import sys
 import time
-import urllib.parse
 
 API = "https://api.github.com/graphql"
 VERSION = "1.0.0"
@@ -40,7 +38,7 @@ def get_token():
     tok = os.environ.get("GITHUB_TOKEN")
     if tok:
         return tok
-    p = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True)
+    p = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, check=False)
     if p.returncode != 0 or not p.stdout.strip():
         sys.exit("错误：拿不到 GitHub token。请先 gh auth login，或设置 GITHUB_TOKEN。")
     return p.stdout.strip()
@@ -61,7 +59,7 @@ class GQL:
                  "-H", "Content-Type: application/json",
                  "-d", json.dumps(body, ensure_ascii=False),
                  API],
-                capture_output=True, text=True, encoding="utf-8")
+                capture_output=True, text=True, encoding="utf-8", check=False)
             self.calls += 1
             if p.returncode != 0 or not p.stdout.strip():
                 last = RuntimeError(f"网络错误 rc={p.returncode} {p.stderr[:200]}")
@@ -165,17 +163,13 @@ class Lists:
     def _build_member_map(self):
         q = ('query{viewer{lists(first:50){nodes{id name items(first:100){pageInfo{hasNextPage endCursor}'
              'nodes{... on Repository{nameWithOwner}}}}}}}')
-        # 简化：假设每清单 <100 条；超过时分页
+        # 简化：假设每清单 <100 条；超过时分页（GitHub 未提供反向成员查询，
+        # 这里只取第一页，超大清单需配合 items_of 逐清单分页）
         self._member_map = {}
-        after = None
-        while True:
-            d = self.gql(q)
-            done = True
-            for n in d["viewer"]["lists"]["nodes"]:
-                for it in n["items"]["nodes"]:
-                    self._member_map.setdefault(it["nameWithOwner"], []).append(n["id"])
-            # 由于查询形态限制，这里只处理第一页；清单>100条时提示
-            break
+        d = self.gql(q)
+        for n in d["viewer"]["lists"]["nodes"]:
+            for it in n["items"]["nodes"]:
+                self._member_map.setdefault(it["nameWithOwner"], []).append(n["id"])
         return self._member_map
 
     def set_lists(self, repo_node_id, list_ids):
@@ -265,7 +259,7 @@ def repo_meta(gql, full_name):
     p = subprocess.run(
         ["curl", "-s", "-H", f"Authorization: bearer {get_token()}",
          f"https://api.github.com/repos/{full_name}"],
-        capture_output=True, text=True, encoding="utf-8")
+        capture_output=True, text=True, encoding="utf-8", check=False)
     r = json.loads(p.stdout)
     return {"name": full_name, "description": r.get("description"),
             "topics": r.get("topics") or [], "language": r.get("language")}
@@ -276,6 +270,10 @@ def repo_meta(gql, full_name):
 # --------------------------------------------------------------------------
 
 def cmd_lists(args):
+    # lists 只读远端清单，不依赖本地配置；但显式给了 --config 时校验它存在，
+    # 避免用户拿它测试配置路径时静默通过。
+    if getattr(args, "config", None) and args.config != "config.json":
+        load_config(args.config)
     g = GQL(get_token())
     l = Lists(g)
     l.refresh()
@@ -332,19 +330,17 @@ def cmd_sync(args):
     if my and not args.skip_mine:
         owner = my.get("owner")
         p = subprocess.run(["gh", "api", f"/users/{owner}/repos?affiliation=owner&per_page=100&sort=full_name"],
-                           capture_output=True, text=True, encoding="utf-8")
+                           capture_output=True, text=True, encoding="utf-8", check=False)
         for r in json.loads(p.stdout):
             if r["private"] and not my.get("include_private", False):
                 continue
             full = r["full_name"]
             if full not in stars:
-                subprocess.run(["gh", "api", "-X", "PUT", f"/user/starred/{full}"], capture_output=True)
+                subprocess.run(["gh", "api", "-X", "PUT", f"/user/starred/{full}"],
+                               capture_output=True, check=False)
                 stars[full] = {"id": r["node_id"], "starred_at": None}
                 print(f"  ★ 已 star 自己的仓库：{full}")
             target = my["name"]
-            if full not in l._member_map or target not in [
-                    n for n in l._member_map.get(full, [])]:
-                pass  # member_map 存的是 id，需要名字映射
             lid = list_ids[target]
             cur = l.lists_of_repo(full)
             if lid not in cur:
@@ -392,7 +388,7 @@ def cmd_plan(args):
     my = cfg.get("my_list")
     if my:
         p = subprocess.run(["gh", "api", f"/users/{my['owner']}/repos?affiliation=owner&per_page=100"],
-                           capture_output=True, text=True, encoding="utf-8")
+                           capture_output=True, text=True, encoding="utf-8", check=False)
         for r in json.loads(p.stdout):
             if not r["private"] and r["full_name"] not in stars:
                 print(f"  [plan] 将 star 自己的仓库：{r['full_name']}")
@@ -403,7 +399,7 @@ def cmd_plan(args):
 
 def cmd_add(args):
     """手动把一个仓库加入清单（追加语义）。"""
-    cfg = load_config(args.config) if args.config else {}
+    load_config(args.config)  # 校验配置存在；add 本身只需要清单名
     g = GQL(get_token())
     l = Lists(g)
     l.refresh()
@@ -427,11 +423,15 @@ def main():
     ap.add_argument("--config", default="config.json", help="配置文件路径（默认 config.json）")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("sync", help="增量同步：规则分类新 star（+ 可选自动 star 自己的仓库）")
-    p = sub.add_parser("plan", help="预览将要做的变更")
-    p = sub.add_parser("inbox", help="列出未分类仓库及规则建议")
-    p = sub.add_parser("lists", help="查看清单及数量")
-    p = sub.add_parser("add", help="把仓库加入清单（追加语义）")
+    # 允许 --config 写在子命令后面：SUPPRESS 让子命令未显式给出时不覆盖全局值
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--config", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+
+    sub.add_parser("sync", parents=[common], help="增量同步：规则分类新 star（+ 可选自动 star 自己的仓库）")
+    sub.add_parser("plan", parents=[common], help="预览将要做的变更")
+    sub.add_parser("inbox", parents=[common], help="列出未分类仓库及规则建议")
+    sub.add_parser("lists", parents=[common], help="查看清单及数量")
+    p = sub.add_parser("add", parents=[common], help="把仓库加入清单（追加语义）")
     p.add_argument("repo")
     p.add_argument("list_name")
 
