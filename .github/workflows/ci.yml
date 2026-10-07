@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install ruff
+        run: pip install ruff
+      - name: Lint
+        run: ruff check stars_lists.py
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: CLI help works (no token needed)
+        run: python stars_lists.py --help
+      - name: Missing config exits with error
+        run: |
+          python stars_lists.py lists --config /nonexistent.json 2>&1 | grep -q "找不到配置文件" && exit 0 || exit 1
+        shell: bash

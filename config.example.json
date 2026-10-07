@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "stars-lists config",
+  "type": "object",
+  "required": ["lists"],
+  "properties": {
+    "lists": {
+      "type": "array",
+      "description": "清单与分类规则。any = 关键词（匹配仓库名/描述/topics，不区分大小写）；languages = 主语言命中。",
+      "items": {
+        "type": "object",
+        "required": ["name", "any"],
+        "properties": {
+          "name": { "type": "string", "description": "清单名（支持 emoji）" },
+          "description": { "type": "string", "description": "清单简介（公开页面可见）" },
+          "private": { "type": "boolean", "default": false },
+          "any": { "type": "array", "items": { "type": "string" } },
+          "languages": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "my_list": {
+      "type": "object",
+      "description": "自动 star 自己名下的新仓库并归入指定清单。",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "owner": { "type": "string" },
+        "include_private": { "type": "boolean", "default": false }
+      }
+    }
+  },
+  "example": {
+    "lists": [
+      {
+        "name": "🤖 AI 编程代理与技能",
+        "description": "AI 编程代理与 agent skills",
+        "any": ["claude-code", "codex", "opencode", "agent-skills", "coding-agent", "ai-agent", "harness"]
+      },
+      {
+        "name": "🎬 播放器·影音·下载",
+        "description": "播放器与下载工具",
+        "any": ["mpv", "anime4k", "motrix", "ffmpeg", "torrent", "tracker"],
+        "languages": ["GLSL"]
+      },
+      {
+        "name": "📖 私密收藏",
+        "description": "仅自己可见",
+        "private": true,
+        "any": ["comic", "manga", "picacg", "jmcomic"]
+      }
+    ],
+    "my_list": {
+      "name": "💎 我的项目",
+      "description": "我的原创项目",
+      "owner": "your-username",
+      "include_private": false
+    }
+  }
+}

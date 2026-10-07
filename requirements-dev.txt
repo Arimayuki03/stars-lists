@@ -1,0 +1,4 @@
+# stars-lists 自身不依赖任何第三方 Python 包（纯标准库）。
+# 运行前提：本机安装并登录 GitHub CLI（gh），或设置 GITHUB_TOKEN 环境变量。
+# ruff 仅开发时用于 lint，运行不需要。
+ruff>=0.4

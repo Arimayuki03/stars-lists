@@ -1,0 +1,11 @@
+# 本地私有配置（含个人分类规则，按需决定是否公开）
+config.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# 本地产物
+*.log
+.state.json
