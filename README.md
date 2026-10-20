@@ -106,7 +106,7 @@ python stars_lists.py lists
 ```
 stars_lists.py [--config config.json] <command>
 
-  sync     增量同步：规则分类新 star（可选自动 star 自己的新仓库）
+  sync     增量同步：规则分类新 star（可选自动 star 自己的新仓库，--skip-mine 跳过）
   plan     预览将要做的变更，不做修改
   inbox    列出未分类的 star 仓库及规则命中建议
   lists    查看当前清单及条目数
@@ -138,6 +138,7 @@ stars_lists.py [--config config.json] <command>
   这类多清单归属不被破坏。
 - **自动 star 自己的仓库**：配置 `my_list` 后，`sync` 会检查你名下是否有
   未 star 的新仓库，自动 star 并归入你的清单（私有仓库默认跳过）。
+  只想整理已有 star、不想改动自己的仓库时，加 `--skip-mine`。
 - **清单自动创建**：规则里写了但还不存在的清单会自动创建（含描述与私密标记）。
 
 ## 📄 配置

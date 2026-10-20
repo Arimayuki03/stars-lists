@@ -427,7 +427,9 @@ def main():
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--config", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
 
-    sub.add_parser("sync", parents=[common], help="增量同步：规则分类新 star（+ 可选自动 star 自己的仓库）")
+    p = sub.add_parser("sync", parents=[common], help="增量同步：规则分类新 star（+ 可选自动 star 自己的仓库）")
+    p.add_argument("--skip-mine", dest="skip_mine", action="store_true",
+                   help="跳过「star 自己仓库」步骤")
     sub.add_parser("plan", parents=[common], help="预览将要做的变更")
     sub.add_parser("inbox", parents=[common], help="列出未分类仓库及规则建议")
     sub.add_parser("lists", parents=[common], help="查看清单及数量")
